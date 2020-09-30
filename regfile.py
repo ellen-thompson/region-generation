@@ -13,7 +13,52 @@ output_path = 'default'
 parameters_string = "#Region file format: DS9 version 4.1\nglobal color=green dashlist=8 3 width=1 font= 'helvetica 10 normal roman' select=1 highlite=1 dash=0 fixed=0 edit=1 move=1 delete=1 include=1 source=1\nimage\npolygon"
 
 
-def sigmas(seqid,mod,emin,emax):
+
+
+def sigma(seqid,mod,emin,emax,sigma):
+    '''Opens event file, performs energy cut, performs and plots canny edge detection for chosen sigma and returns plots'''
+    evt_file = 'nu'+str(seqid)+str(mod)+'01_cl.evt'
+    hdul = fits.open(evt_file)
+    data = hdul[1].data
+    DET1X = data["DET1X"]
+    DET1Y = data["DET1Y"]
+    PI = data["PI"]
+    if emin == 'default':
+        emin = 36
+    else:
+        emin = emin
+    if emax == 'default':
+        emax == 209
+    else:
+        emax = emax
+    del_PI_indices = [i for i, x in enumerate(PI) if x<=emin or x>=emax]
+    cut_DET1X = np.delete(DET1X, del_PI_indices)
+    cut_DET1Y = np.delete(DET1Y, del_PI_indices)
+    cut_counts_arrays = np.histogram2d(cut_DET1X, cut_DET1Y, [360,360], range=[[0,360],[0,360]])
+    cut_counts = np.hstack(cut_counts_arrays[0])
+    cut_counts_binned = np.split(cut_counts,360)
+    im = np.column_stack(cut_counts_binned)
+    if sigma == 'default':
+        sigma = 10*np.std(cut_counts)
+    else:
+        sigma = sigma
+    edges = feature.canny(im, sigma=sigma)
+    fig, (ax1, ax2) = plt.subplots(nrows=1, ncols=2, figsize=(8, 5), sharex=True, sharey=True)
+
+    ax1.imshow(im, cmap=plt.cm.gray)
+    ax1.axis('off')
+    ax1.set_title('Original', fontsize=15)
+
+    ax2.imshow(edges, cmap=plt.cm.gray)
+    ax2.axis('off')
+    ax2.set_title(r'Canny Filter, $\sigma='+str(sigma)+'$', fontsize=15)
+    fig.tight_layout()
+    plot = plt.show()
+    return plot
+
+
+
+def sigmarange(seqid,mod,emin,emax):
     '''Opens event file, performs energy cut, performs and plots canny edge detection for range of sigmas and returns plots'''
     evt_file = 'nu'+seqid+mod+'01_cl.evt'
     hdul = fits.open(evt_file)
