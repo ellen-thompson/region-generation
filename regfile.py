@@ -1,6 +1,8 @@
 import os
 import numpy as np
+import copy
 import matplotlib.pyplot as plt
+import matplotlib.colors as colors
 from astropy.io import fits
 from scipy import ndimage as ndi
 from skimage import feature
@@ -12,7 +14,43 @@ sigma = 'default'
 output_path = 'default'
 parameters_string = "#Region file format: DS9 version 4.1\nglobal color=green dashlist=8 3 width=1 font= 'helvetica 10 normal roman' select=1 highlite=1 dash=0 fixed=0 edit=1 move=1 delete=1 include=1 source=1\nimage\npolygon"
 
+def lin_image(seqid,mod):
+    '''Opens event file, performs energy cut, returns plotted image of event file in w/ linear scale'''
+    evt_file = 'nu'+str(seqid)+str(mod)+'01_cl.evt'
+    hdul = fits.open(evt_file)
+    data = hdul[1].data
+    DET1X = data["DET1X"]
+    DET1Y = data["DET1Y"]
+    counts_arrays = np.histogram2d(DET1X, DET1Y, [360,360], range=[[0,360],[0,360]])
+    counts = np.hstack(counts_arrays[0])
+    counts_binned = np.split(counts,360)
+    im = np.column_stack(counts_binned)
 
+    fig,ax = plt.subplots(1,figsize=(7,7))
+    ax.imshow(im,interpolation='nearest',cmap='viridis')
+    ax.axis('off')
+    plot = plt.show()
+    return plot
+
+def log_image(seqid,mod):
+    '''Opens event file, performs energy cut, returns plotted image of event file w/ log scale'''
+    evt_file = 'nu'+str(seqid)+str(mod)+'01_cl.evt'
+    hdul = fits.open(evt_file)
+    data = hdul[1].data
+    DET1X = data["DET1X"]
+    DET1Y = data["DET1Y"]
+    counts_arrays = np.histogram2d(DET1X, DET1Y, [360,360], range=[[0,360],[0,360]])
+    counts = np.hstack(counts_arrays[0])
+    counts_binned = np.split(counts,360)
+    im = np.column_stack(counts_binned)
+
+    fig,ax = plt.subplots(1,figsize=(7,7))
+    my_cmap = copy.copy(plt.cm.get_cmap('viridis'))
+    my_cmap.set_bad((0,0,0))
+    ax.imshow(im,norm=colors.LogNorm(),interpolation='nearest',cmap=my_cmap)
+    ax.axis('off')
+    plot = plt.show()
+    return plot
 
 
 def sigma(seqid,mod,emin,emax,sigma):
