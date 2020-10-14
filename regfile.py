@@ -3,19 +3,17 @@ import numpy as np
 import copy
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
+import matplotlib.patches as patches
 from astropy.io import fits
 from scipy import ndimage as ndi
 from skimage import feature
 
 
-emin = 'default'
-emax = 'default'
-sigma = 'default'
-output_path = 'default'
 parameters_string = "#Region file format: DS9 version 4.1\nglobal color=green dashlist=8 3 width=1 font= 'helvetica 10 normal roman' select=1 highlite=1 dash=0 fixed=0 edit=1 move=1 delete=1 include=1 source=1\nimage\npolygon"
 
-def lin_image(seqid,mod):
-    '''Opens event file, performs energy cut, returns plotted image of event file in w/ linear scale'''
+
+def image(seqid,mod,scale):
+    '''Opens event file, returns plotted image of event file w/ lin or log scale'''
     evt_file = 'nu'+str(seqid)+str(mod)+'01_cl.evt'
     hdul = fits.open(evt_file)
     data = hdul[1].data
@@ -25,30 +23,16 @@ def lin_image(seqid,mod):
     counts = np.hstack(counts_arrays[0])
     counts_binned = np.split(counts,360)
     im = np.column_stack(counts_binned)
-
     fig,ax = plt.subplots(1,figsize=(7,7))
-    ax.imshow(im,interpolation='nearest',cmap='viridis')
     ax.axis('off')
-    plot = plt.show()
-    return plot
+    assert scale == 'log' or scale == 'lin',"Scale must be 'log' or 'lin'"
+    if scale == 'log':
+        my_cmap = copy.copy(plt.cm.get_cmap('viridis'))
+        my_cmap.set_bad((0,0,0))
+        ax.imshow(im,norm=colors.LogNorm(),interpolation='nearest',cmap=my_cmap, origin = 'lower')
+    if scale == 'lin':
+        ax.imshow(im,interpolation='nearest',cmap='viridis', origin = 'lower')
 
-def log_image(seqid,mod):
-    '''Opens event file, performs energy cut, returns plotted image of event file w/ log scale'''
-    evt_file = 'nu'+str(seqid)+str(mod)+'01_cl.evt'
-    hdul = fits.open(evt_file)
-    data = hdul[1].data
-    DET1X = data["DET1X"]
-    DET1Y = data["DET1Y"]
-    counts_arrays = np.histogram2d(DET1X, DET1Y, [360,360], range=[[0,360],[0,360]])
-    counts = np.hstack(counts_arrays[0])
-    counts_binned = np.split(counts,360)
-    im = np.column_stack(counts_binned)
-
-    fig,ax = plt.subplots(1,figsize=(7,7))
-    my_cmap = copy.copy(plt.cm.get_cmap('viridis'))
-    my_cmap.set_bad((0,0,0))
-    ax.imshow(im,norm=colors.LogNorm(),interpolation='nearest',cmap=my_cmap)
-    ax.axis('off')
     plot = plt.show()
     return plot
 
@@ -61,14 +45,6 @@ def sigma(seqid,mod,emin,emax,sigma):
     DET1X = data["DET1X"]
     DET1Y = data["DET1Y"]
     PI = data["PI"]
-    if emin == 'default':
-        emin = 36
-    else:
-        emin = emin
-    if emax == 'default':
-        emax == 209
-    else:
-        emax = emax
     del_PI_indices = [i for i, x in enumerate(PI) if x<=emin or x>=emax]
     cut_DET1X = np.delete(DET1X, del_PI_indices)
     cut_DET1Y = np.delete(DET1Y, del_PI_indices)
@@ -76,18 +52,14 @@ def sigma(seqid,mod,emin,emax,sigma):
     cut_counts = np.hstack(cut_counts_arrays[0])
     cut_counts_binned = np.split(cut_counts,360)
     im = np.column_stack(cut_counts_binned)
-    if sigma == 'default':
-        sigma = 10*np.std(cut_counts)
-    else:
-        sigma = sigma
     edges = feature.canny(im, sigma=sigma)
     fig, (ax1, ax2) = plt.subplots(nrows=1, ncols=2, figsize=(8, 5), sharex=True, sharey=True)
 
-    ax1.imshow(im, cmap=plt.cm.gray)
+    ax1.imshow(im, cmap=plt.cm.gray, origin = 'lower')
     ax1.axis('off')
     ax1.set_title('Original', fontsize=15)
 
-    ax2.imshow(edges, cmap=plt.cm.gray)
+    ax2.imshow(edges, cmap=plt.cm.gray, origin = 'lower')
     ax2.axis('off')
     ax2.set_title(r'Canny Filter, $\sigma='+str(sigma)+'$', fontsize=15)
     fig.tight_layout()
@@ -96,7 +68,7 @@ def sigma(seqid,mod,emin,emax,sigma):
 
 
 
-def sigmarange(seqid,mod,emin,emax):
+def sigma_range(seqid,mod,emin,emax):
     '''Opens event file, performs energy cut, performs and plots canny edge detection for range of sigmas and returns plots'''
     evt_file = 'nu'+seqid+mod+'01_cl.evt'
     hdul = fits.open(evt_file)
@@ -104,14 +76,6 @@ def sigmarange(seqid,mod,emin,emax):
     DET1X = data["DET1X"]
     DET1Y = data["DET1Y"]
     PI = data["PI"]
-    if emin == 'default':
-        emin = 36
-    else:
-        emin = emin
-    if emax == 'default':
-        emax == 209
-    else:
-        emax = emax
     del_PI_indices = [i for i, x in enumerate(PI) if x<=emin or x>=emax]
     cut_DET1X = np.delete(DET1X, del_PI_indices)
     cut_DET1Y = np.delete(DET1Y, del_PI_indices)
@@ -133,29 +97,21 @@ def sigmarange(seqid,mod,emin,emax):
         else:
             title = r'Canny Filter, $\sigma={}$'.format(s)
         ax = axs[i // nc][i % nc]
-        ax.imshow(edge, cmap=plt.cm.gray)
+        ax.imshow(edge, cmap=plt.cm.gray, origin = 'lower')
         ax.axis('off')
         ax.set_title(title, fontsize=12)
     #fig.tight_layout()
     plot = plt.show()
     return plot
 
-def write_reg_file(seqid,mod,emin,emax,sigma,output_path,name_of_region_file):
-    '''Opens event file, performs energy cut, performs and plots canny edge detection for given sigma,identifies corners,writes/overwrites region file'''
+def check_region(seqid,mod,emin,emax,sigma,scale):
+    '''Opens event file, performs energy cut, identifies polygon region corners from canny edge detection,plots region over original image in linear scale'''
     evt_file = 'nu'+str(seqid)+str(mod)+'01_cl.evt'
     hdul = fits.open(evt_file)
     data = hdul[1].data
     DET1X = data["DET1X"]
     DET1Y = data["DET1Y"]
     PI = data["PI"]
-    if emin == 'default':
-        emin = 36
-    else:
-        emin = emin
-    if emax == 'default':
-        emax == 209
-    else:
-        emax = emax
     del_PI_indices = [i for i, x in enumerate(PI) if x<=emin or x>=emax]
     cut_DET1X = np.delete(DET1X, del_PI_indices)
     cut_DET1Y = np.delete(DET1Y, del_PI_indices)
@@ -163,10 +119,75 @@ def write_reg_file(seqid,mod,emin,emax,sigma,output_path,name_of_region_file):
     cut_counts = np.hstack(cut_counts_arrays[0])
     cut_counts_binned = np.split(cut_counts,360)
     im = np.column_stack(cut_counts_binned)
-    if sigma == 'default':
-        sigma = 10*np.std(cut_counts)
-    else:
-        sigma = sigma
+    edges = feature.canny(im, sigma=sigma)
+    indices = np.where(edges != [0])
+    x_coords = list(indices[1])
+    y_coords = list(indices[0])
+    region_cols = list(set(x_coords))
+    curve_perimeter_coords_1 = []
+    for i in region_cols:
+        if i in curve_perimeter_coords_1:
+            pass
+        else:
+            curve_perimeter_coords_1.append(i)
+            y_coord_indices =[j for j, x in enumerate(x_coords) if x == i]
+            y_coords_for_i = []
+            for i in y_coord_indices:
+                y_coords_for_i.append(y_coords[i])
+            curve_perimeter_coords_1.append(max(y_coords_for_i))
+    corners = []
+    for i in curve_perimeter_coords_1:
+        corners.append(i)
+    region_cols_2 = region_cols[::-1]
+    curve_perimeter_coords_2 = []
+    for i in region_cols_2:
+        if i in curve_perimeter_coords_2:
+            pass
+        else:
+            curve_perimeter_coords_2.append(i)
+            y_coord_indices =[j for j, x in enumerate(x_coords) if x == i]
+            y_coords_for_i = []
+            for i in y_coord_indices:
+                y_coords_for_i.append(y_coords[i])
+            curve_perimeter_coords_2.append(min(y_coords_for_i))
+    for i in curve_perimeter_coords_2:
+        corners.append(i)
+    polygon_corners = []
+
+    for i in range(0,len(corners)-1,2):
+        corner = [corners[i],corners[i+1]]
+        polygon_corners.append(corner)
+    fig,ax = plt.subplots(1,figsize=(7,7))
+    ax.axis('off')
+    assert scale == 'log' or scale == 'lin',"Scale must be 'log' or 'lin'"
+    if scale == 'log':
+        my_cmap = copy.copy(plt.cm.get_cmap('viridis'))
+        my_cmap.set_bad((0,0,0))
+        ax.imshow(im,norm=colors.LogNorm(),interpolation='nearest',cmap=my_cmap, origin = 'lower')
+    if scale == 'lin':
+        ax.imshow(im,interpolation='nearest',cmap='viridis', origin = 'lower')
+    polygon_region = patches.Polygon(polygon_corners, edgecolor = 'white', facecolor ='none',linewidth = 2)
+    ax.add_patch(polygon_region)
+    plot = plt.show()
+    return plot
+
+
+
+def write_regfile(seqid,mod,emin,emax,sigma,output_path,name_of_region_file):
+    '''Opens event file, performs energy cut,identifies polygon region corners from canny edge detection, writes/overwrites region file'''
+    evt_file = 'nu'+str(seqid)+str(mod)+'01_cl.evt'
+    hdul = fits.open(evt_file)
+    data = hdul[1].data
+    DET1X = data["DET1X"]
+    DET1Y = data["DET1Y"]
+    PI = data["PI"]
+    del_PI_indices = [i for i, x in enumerate(PI) if x<=emin or x>=emax]
+    cut_DET1X = np.delete(DET1X, del_PI_indices)
+    cut_DET1Y = np.delete(DET1Y, del_PI_indices)
+    cut_counts_arrays = np.histogram2d(cut_DET1X, cut_DET1Y, [360,360], range=[[0,360],[0,360]])
+    cut_counts = np.hstack(cut_counts_arrays[0])
+    cut_counts_binned = np.split(cut_counts,360)
+    im = np.column_stack(cut_counts_binned)
     edges = feature.canny(im, sigma=sigma)
     indices = np.where(edges != [0])
     x_coords = list(indices[1])
