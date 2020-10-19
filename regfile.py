@@ -5,6 +5,9 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 import matplotlib.patches as patches
 from astropy.io import fits
+import astropy.units as u
+from nustar_gen import info, utils
+ns = info.NuSTAR()
 from scipy import ndimage as ndi
 from skimage import feature
 
@@ -23,6 +26,50 @@ def image(seqid,mod,scale):
     counts = np.hstack(counts_arrays[0])
     counts_binned = np.split(counts,360)
     im = np.column_stack(counts_binned)
+    fig,ax = plt.subplots(1,figsize=(7,7))
+    ax.axis('off')
+    assert scale == 'log' or scale == 'lin',"Scale must be 'log' or 'lin'"
+    if scale == 'log':
+        my_cmap = copy.copy(plt.cm.get_cmap('viridis'))
+        my_cmap.set_bad((0,0,0))
+        ax.imshow(im,norm=colors.LogNorm(),interpolation='nearest',cmap=my_cmap, origin = 'lower')
+    if scale == 'lin':
+        ax.imshow(im,interpolation='nearest',cmap='viridis', origin = 'lower')
+
+    plot = plt.show()
+    return plot
+
+def filter_source(seqid,mod,limit,scale):
+    '''Opens source and event files, interpolates source positions onto event times, filters event file and writes filtered file, plots image with point source removed'''
+    sky2det = 'nu'+str(seqid)+str(mod)+'_sky2det.fits'
+    hdul = fits.open(sky2det)
+    src_data = hdul[1].data
+    src_time = src_data["TIME"]
+    src_DET1X = src_data["DET1X"]
+    src_DET1Y = src_data["DET1Y"]
+    evt_file = 'nu'+str(seqid)+str(mod)+'01_cl.evt'
+    hdul = fits.open(evt_file)
+    evt_data = hdul[1].data
+    evt_time = evt_data["TIME"]
+    evt_DET1X = evt_data["DET1X"]
+    evt_DET1Y = evt_data["DET1Y"]
+    xr = np.interp(evt_time,src_time,src_DET1X)
+    yr = np.interp(evt_time,src_time,src_DET1Y)
+    dr = np.sqrt((evt_DET1X-xr)**2 + (evt_DET1Y - yr)**2)
+    limit = limit*u.arcmin
+    limit_pix = (limit/ns.pixel).cgs
+    filt = np.where((dr>limit_pix))[0]
+    keep_DET1X = evt_DET1X[filt]
+    keep_DET1Y = evt_DET1Y[filt]
+    hdul = fits.open(evt_file)
+    hdul[1].data = evt_data[filt]
+    hdul.writeto('nu'+str(seqid)+'filt'+str(mod)+'01_cl.evt',overwrite=True)
+    with fits.open('nu80002012004A01_cl.evt', mode='update') as hdul:
+        hdul.flush()
+    keep_counts_arrays = np.histogram2d(keep_DET1X, keep_DET1Y, [360,360], range=[[0,360],[0,360]])
+    keep_counts = np.hstack(keep_counts_arrays[0])
+    keep_counts_binned = np.split(keep_counts,360)
+    im = np.column_stack(keep_counts_binned)
     fig,ax = plt.subplots(1,figsize=(7,7))
     ax.axis('off')
     assert scale == 'log' or scale == 'lin',"Scale must be 'log' or 'lin'"
