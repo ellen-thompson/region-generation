@@ -268,10 +268,75 @@ def write_regfile(seqid,mod,emin,emax,sigma,output_path,name_of_region_file):
             curve_perimeter_coords_2.append(min(y_coords_for_i))
     for i in curve_perimeter_coords_2:
         corners.append(i)
-    if output_path == 'default':
-        output_path = os.getcwd()
-    else:
-        output_path = os.chdir(output_path)
+    os.chdir(output_path)
     region_file = open(name_of_region_file, "w")
     region_file.write(parameters_string + str(tuple(corners)))
     region_file.close()
+
+def save_image(seqid,mod,emin,emax,sigma,scale,output_path,name_of_image):
+    '''Opens event file, performs energy cut, identifies polygon region corners from canny edge detection,plots region over original image in linear scale'''
+    evt_file = 'nu'+str(seqid)+str(mod)+'01_cl.evt'
+    hdul = fits.open(evt_file)
+    data = hdul[1].data
+    DET1X = data["DET1X"]
+    DET1Y = data["DET1Y"]
+    PI = data["PI"]
+    del_PI_indices = [i for i, x in enumerate(PI) if x<=emin or x>=emax]
+    cut_DET1X = np.delete(DET1X, del_PI_indices)
+    cut_DET1Y = np.delete(DET1Y, del_PI_indices)
+    cut_counts_arrays = np.histogram2d(cut_DET1X, cut_DET1Y, [360,360], range=[[0,360],[0,360]])
+    cut_counts = np.hstack(cut_counts_arrays[0])
+    cut_counts_binned = np.split(cut_counts,360)
+    im = np.column_stack(cut_counts_binned)
+    edges = feature.canny(im, sigma=sigma)
+    indices = np.where(edges != [0])
+    x_coords = list(indices[1])
+    y_coords = list(indices[0])
+    region_cols = list(set(x_coords))
+    curve_perimeter_coords_1 = []
+    for i in region_cols:
+        if i in curve_perimeter_coords_1:
+            pass
+        else:
+            curve_perimeter_coords_1.append(i)
+            y_coord_indices =[j for j, x in enumerate(x_coords) if x == i]
+            y_coords_for_i = []
+            for i in y_coord_indices:
+                y_coords_for_i.append(y_coords[i])
+            curve_perimeter_coords_1.append(max(y_coords_for_i))
+    corners = []
+    for i in curve_perimeter_coords_1:
+        corners.append(i)
+    region_cols_2 = region_cols[::-1]
+    curve_perimeter_coords_2 = []
+    for i in region_cols_2:
+        if i in curve_perimeter_coords_2:
+            pass
+        else:
+            curve_perimeter_coords_2.append(i)
+            y_coord_indices =[j for j, x in enumerate(x_coords) if x == i]
+            y_coords_for_i = []
+            for i in y_coord_indices:
+                y_coords_for_i.append(y_coords[i])
+            curve_perimeter_coords_2.append(min(y_coords_for_i))
+    for i in curve_perimeter_coords_2:
+        corners.append(i)
+    polygon_corners = []
+
+    for i in range(0,len(corners)-1,2):
+        corner = [corners[i],corners[i+1]]
+        polygon_corners.append(corner)
+    fig,ax = plt.subplots(1,figsize=(7,7))
+    ax.axis('off')
+    assert scale == 'log' or scale == 'lin',"Scale must be 'log' or 'lin'"
+    if scale == 'log':
+        my_cmap = copy.copy(plt.cm.get_cmap('viridis'))
+        my_cmap.set_bad((0,0,0))
+        ax.imshow(im,norm=colors.LogNorm(),interpolation='nearest',cmap=my_cmap, origin = 'lower')
+    if scale == 'lin':
+        ax.imshow(im,interpolation='nearest',cmap='viridis', origin = 'lower')
+    polygon_region = patches.Polygon(polygon_corners, edgecolor = 'white', facecolor ='none',linewidth = 2)
+    ax.add_patch(polygon_region)
+    os.chdir(output_path)
+    plt.savefig(name_of_image)
+    return
