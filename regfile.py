@@ -64,7 +64,7 @@ def filter_source(seqid,mod,limit,scale):
     hdul = fits.open(evt_file)
     hdul[1].data = evt_data[filt]
     hdul.writeto('nu'+str(seqid)+'filt'+str(mod)+'01_cl.evt',overwrite=True)
-    with fits.open('nu'+str(seqid)+'filt'+str(mod)+'01_cl.evt', mode='update') as hdul:
+    with fits.open('nu'+str(seqid)+str(mod)+'01_cl.evt', mode='update') as hdul:
         hdul.flush()
     keep_counts_arrays = np.histogram2d(keep_DET1X, keep_DET1Y, [360,360], range=[[0,360],[0,360]])
     keep_counts = np.hstack(keep_counts_arrays[0])
