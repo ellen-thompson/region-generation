@@ -1,3 +1,5 @@
+**NOTE: This was an undergraduate research project for a beginning-level programmer! The code works, but it's ugly!**
+
 # Repository for Region Files Program
 To be used with NuSTAR event files to identify Stray Light regions
 
@@ -15,6 +17,11 @@ from nustar_gen: info, utils \
 scipy \
 skimage 
 
+## Room for Improvement
+- insert new ideas i've had since actually taking a programming class - 
+
 ## Feedback
 Anything from code improvement suggestions to new ideas for making and working with region files is very welcome! Feel free to say hi on the NuSTAR Slack channel, 
 which you can join from the [NuSTAR Observer's page](https://www.nustar.caltech.edu/page/observers).
+
+You can also contact me individually at ellent@nmsu.edu
